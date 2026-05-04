@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard - Video Records</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600;700&display=swap');
+body {
+font-family: 'Anuphan', sans-serif;
+transition: background-color 0.3s, color 0.3s;
+}
+/* Dark Mode (Default) */
+body.dark { background: #0f172a; color: #f1f5f9; }
+.dark .glass-card { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); }
+.dark .row-hover:hover { background: rgba(51, 65, 85, 0.4); }
+/* Light Mode */
+body.light { background: #f8fafc; color: #1e293b; }
+.light .glass-card { background: white; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+.light .row-hover:hover { background: #f1f5f9; }
+.light .text-slate-400 { color: #64748b; }
+/* Modal & Components */
+#videoModal {
+display: none;
+position: fixed;
+inset: 0;
+background: rgba(0, 0, 0, 0.95);
+z-index: 100;
+align-items: center;
+justify-content: center;
+padding: 20px;
+backdrop-filter: blur(5px);
+}
+.video-wrapper {
+position: relative;
+width: 100%;
+max-width: 900px;
+background: #000;
+border-radius: 1rem;
+overflow: hidden;
+}
+.badge-open { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); }
+.badge-count { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.3); }
+.badge-close { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
+.stat-card { transition: transform 0.2s; }
+.stat-card:hover { transform: translateY(-2px); }
+</style>
+</head>
+<body class="dark p-4 md:p-8">
+<div class="max-w-7xl mx-auto">
+<!-- Header -->
+<header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+<div>
+<h1 class="text-3xl font-bold tracking-tight">📊 แดชบอร์ดผู้ดูแลระบบ</h1>
+<p class="text-slate-400 mt-1">ตรวจสอบสถานะและรายงานการบันทึกวิดีโอ</p>
+</div>
+<div class="flex gap-2 flex-wrap">
+<button onclick="toggleMode()" id="modeBtn" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl transition font-semibold">☀️ โหมดสว่าง</button>
+<button onclick="refreshData()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-xl transition font-semibold">🔄 รีเฟรช</button>
+<button onclick="exportPDF()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl transition font-semibold">📄 PDF</button>
+</div>
+</header>
+
+<!-- Filters -->
+<div class="glass-card rounded-2xl p-5 mb-6">
+<h3 class="text-sm font-bold text-slate-400 uppercase mb-3">🔍 ตัวกรองข้อมูล</h3>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+<div>
+<label class="block text-xs font-semibold text-slate-400 mb-1">📅 วันที่</label>
+<input type="date" id="searchDate" class="w-full px-4 py-2 rounded-xl border transition outline-none" onkeydown="if(event.key==='Enter')filterData()">
+</div>
+<div>
+<label class="block text-xs font-semibold text-slate-400 mb-1">🏢 รหัส ปณ.</label>
+<input type="text" id="searchBranch" placeholder="เช่น 15220" class="w-full px-4 py-2 rounded-xl border transition outline-none" onkeydown="if(event.key==='Enter')filterData()">
+</div>
+<div>
+<label class="block text-xs font-semibold text-slate-400 mb-1">📦 ประเภท</label>
+<select id="filterType" class="w-full px-4 py-2 rounded-xl border transition outline-none">
+<option value="">ทั้งหมด</option>
+<option value="เปิดเซฟ">🔓 เปิดเซฟ</option>
+<option value="นับเงิน">💵 นับเงิน</option>
+<option value="ปิดเซฟ">🔒 ปิดเซฟ</option>
+</select>
+</div>
+<div>
+<label class="block text-xs font-semibold text-slate-400 mb-1">✅ สถานะ</label>
+<select id="filterStatus" class="w-full px-4 py-2 rounded-xl border transition outline-none">
+<option value="">ทั้งหมด</option>
+<option value="completed">สำเร็จ</option>
+<option value="failed">ไม่สำเร็จ</option>
+</select>
+</div>
+</div>
+<div class="flex gap-3">
+<button onclick="filterData()" class="flex-1 md:flex-none px-6 py-2.5 rounded-xl font-bold text-white transition shadow-md flex items-center justify-center gap-2" style="background:linear-gradient(to right,#0ea5e9,#6366f1)">
+🔍 ค้นหา
+</button>
+<button onclick="clearFilters()" class="px-6 py-2.5 rounded-xl font-bold transition border flex items-center justify-center gap-2 text-slate-400 border-slate-500/30 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30">
+✕ ล้างตัวกรอง
+</button>
+</div>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div class="glass-card stat-card rounded-2xl p-5"><p class="text-slate-400 text-xs font-bold uppercase">รายการทั้งหมด</p><p class="text-3xl font-bold text-sky-400 mt-2" id="statTotal">0</p></div>
+<div class="glass-card stat-card rounded-2xl p-5"><p class="text-slate-400 text-xs font-bold uppercase">บันทึกสำเร็จ</p><p class="text-3xl font-bold text-emerald-400 mt-2" id="statSuccess">0</p></div>
+<div class="glass-card stat-card rounded-2xl p-5"><p class="text-slate-400 text-xs font-bold uppercase">ไม่สำเร็จ</p><p class="text-3xl font-bold text-red-400 mt-2" id="statFailed">0</p></div>
+<div class="glass-card stat-card rounded-2xl p-5"><p class="text-slate-400 text-xs font-bold uppercase">% ความสำเร็จ</p><p class="text-3xl font-bold text-amber-400 mt-2" id="statPercent">0%</p></div>
+</div>
+
+<!-- Charts -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+<div class="glass-card rounded-2xl p-6">
+<h3 class="text-lg font-bold mb-4 flex items-center gap-2">📈 อัตราความสำเร็จ</h3>
+<div class="relative h-64"><canvas id="successChart"></canvas></div>
+</div>
+<div class="glass-card rounded-2xl p-6">
+<h3 class="text-lg font-bold mb-4 flex items-center gap-2">📊 สัดส่วนประเภทงาน</h3>
+<div class="relative h-64"><canvas id="typeChart"></canvas></div>
+</div>
+</div>
+
+<!-- Summary Table -->
+<div class="glass-card rounded-2xl p-6 mb-6 overflow-hidden">
+<h3 class="text-lg font-bold mb-4">📋 สรุปประจำวัน (ความครบถ้วน)</h3>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm">
+<thead class="bg-slate-500/10 text-xs uppercase font-bold">
+<tr>
+<th class="py-3 px-4 text-slate-400">วันที่</th>
+<th class="py-3 px-4 text-slate-400">รหัส ปณ.</th>
+<th class="py-3 px-4 text-slate-400">ชื่อที่ทำการ</th>
+<th class="py-3 px-4 text-center text-sky-400">🔓 เปิดเซฟ</th>
+<th class="py-3 px-4 text-center text-emerald-400">💵 นับเงิน</th>
+<th class="py-3 px-4 text-center text-amber-400">🔒 ปิดเซฟ</th>
+<th class="py-3 px-4 text-center text-slate-400">สถานะ</th>
+</tr>
+</thead>
+<tbody id="summaryBody" class="divide-y divide-slate-500/10">
+<tr><td colspan="7" class="py-4 text-center text-slate-500">กำลังประมวลผล...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<!-- Main Data Table -->
+<div class="glass-card rounded-3xl overflow-hidden transition-all">
+<div class="p-6 border-b border-slate-500/10"><h3 class="text-lg font-bold">📜 รายการบันทึกทั้งหมด</h3></div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-slate-500/10 text-xs uppercase font-bold">
+<tr>
+<th class="py-4 px-6 text-slate-400">วันที่/เวลา</th>
+<th class="py-4 px-6 text-slate-400">ที่ทำการ</th>
+<th class="py-4 px-6 text-slate-400">รหัส ปณ.</th>
+<th class="py-4 px-6 text-slate-400">ประเภท</th>
+<th class="py-4 px-6 text-center text-slate-400">สถานะ</th>
+<th class="py-4 px-6 text-center text-slate-400">วิดีโอ</th>
+</tr>
+</thead>
+<tbody id="dashboardBody" class="divide-y divide-slate-500/10">
+<tr><td colspan="6" class="py-20 text-center text-slate-500 italic">กำลังโหลดข้อมูล...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- Video Modal -->
+<div id="videoModal" onclick="closeModal(event)">
+<div class="video-wrapper" onclick="event.stopPropagation()">
+<button onclick="closeModal()" class="absolute top-4 right-4 bg-white/20 hover:bg-red-500 text-white rounded-full p-2 z-20 w-10 h-10 flex items-center justify-center transition">✕</button>
+<div id="videoContent"></div>
+</div>
+</div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbzz8K5w3xHI-Psk1x8xiEjkEyBQiavIsaYcWL_W4_UpvSiC2898g2IkSFgte7QM7F3qvQ/exec";
+let allData = [];
+let filteredData = [];
+let chart1 = null, chart2 = null;
+
+// Toggle Mode
+function toggleMode() {
+const b = document.body, btn = document.getElementById('modeBtn');
+if (b.classList.contains('dark')) {
+b.classList.replace('dark', 'light');
+btn.innerHTML = "🌙 โหมดมืด";
+btn.className = "bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl transition font-semibold";
+} else {
+b.classList.replace('light', 'dark');
+btn.innerHTML = "☀️ โหมดสว่าง";
+btn.className = "bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl transition font-semibold";
+}
+}
+
+// Fetch Data
+async function refreshData() {
+document.getElementById('dashboardBody').innerHTML = '<tr><td colspan="6" class="py-20 text-center text-slate-500 italic">กำลังโหลดข้อมูล...</td></tr>';
+try {
+const res = await fetch(API_URL + "?action=getList");
+const data = await res.json();
+if (data.status === "success") {
+allData = data.rows;
+filteredData = allData;
+renderTable();
+renderSummary();
+updateStats();
+renderCharts();
+}
+} catch (e) {
+document.getElementById('dashboardBody').innerHTML = '<tr><td colspan="6" class="py-10 text-center text-red-400 font-bold">ไม่สามารถเชื่อมต่อ API ได้<br><span class="text-xs text-slate-400">ตรวจสอบ Deploy (Who has access: Anyone)</span></td></tr>';
+}
+}
+
+// Filter Data
+function filterData() {
+const d = (document.getElementById('searchDate').value || '').trim();
+const br = (document.getElementById('searchBranch').value || '').trim().toLowerCase();
+const t = document.getElementById('filterType').value;
+const s = document.getElementById('filterStatus').value;
+filteredData = allData.filter(r => {
+const dateStr = (r.dateOnly || '').toString().trim();
+const branchStr = (r.branch || '').toString().toLowerCase();
+const typeStr = (r.type || '').toString();
+const statusStr = (r.status || '').toString();
+return (!d || dateStr === d)
+  && (!br || branchStr.includes(br))
+  && (!t || typeStr === t)
+  && (!s || statusStr === s);
+});
+renderTable();
+renderSummary();
+updateStats();
+renderCharts();
+}
+
+// Clear Filters
+function clearFilters() {
+document.getElementById('searchDate').value = '';
+document.getElementById('searchBranch').value = '';
+document.getElementById('filterType').value = '';
+document.getElementById('filterStatus').value = '';
+filteredData = allData;
+renderTable();
+renderSummary();
+updateStats();
+renderCharts();
+}
+
+// Get Badge Class
+function getTypeBadge(t) {
+if (t === 'เปิดเซฟ') return 'badge-open';
+if (t === 'นับเงิน') return 'badge-count';
+if (t === 'ปิดเซฟ') return 'badge-close';
+return 'bg-sky-500/20 text-sky-500';
+}
+
+// Render Table
+function renderTable() {
+const tbody = document.getElementById('dashboardBody');
+if (filteredData.length === 0) {
+tbody.innerHTML = '<tr><td colspan="6" class="py-10 text-center text-slate-500">ไม่พบข้อมูล</td></tr>';
+return;
+}
+tbody.innerHTML = filteredData.map(r => `
+<tr class="row-hover transition-colors">
+<td class="py-4 px-6 text-sm text-slate-400">${r.timestamp}</td>
+<td class="py-4 px-6 font-semibold">${r.name}</td>
+<td class="py-4 px-6 text-sm font-mono">${r.branch}</td>
+<td class="py-4 px-6"><span class="px-3 py-1.5 rounded-lg text-xs border font-bold ${getTypeBadge(r.type)}">${r.type}</span></td>
+<td class="py-4 px-6 text-center">${r.status === 'completed' ? '<span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">✓ สำเร็จ</span>' : '<span class="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30">✗ ไม่สำเร็จ</span>'}</td>
+<td class="py-4 px-6 text-center"><button onclick="openPreview('${r.videoUrl}', '${r.name} - ${r.type}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs transition shadow-md inline-flex items-center gap-2 font-semibold">▶ ดูวิดีโอ</button></td>
+</tr>`).join('');
+}
+
+// Render Summary
+function renderSummary() {
+const sum = {};
+filteredData.forEach(r => {
+const k = (r.dateOnly||"")+"|"+r.branch;
+if (!sum[k]) sum[k] = { date: r.dateOnly||"-", branch: r.branch, name: r.name, hasOpen: false, hasCount: false, hasClose: false };
+if (r.type === 'เปิดเซฟ') sum[k].hasOpen = true;
+if (r.type === 'นับเงิน') sum[k].hasCount = true;
+if (r.type === 'ปิดเซฟ') sum[k].hasClose = true;
+});
+const tbody = document.getElementById('summaryBody');
+const keys = Object.keys(sum);
+if (keys.length === 0) {
+tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-slate-500">ไม่พบข้อมูลสรุป</td></tr>';
+return;
+}
+tbody.innerHTML = keys.map(k => {
+const d = sum[k];
+const ok = d.hasOpen && d.hasCount && d.hasClose;
+return `<tr class="row-hover">
+<td class="py-3 px-4 font-mono text-slate-400">${d.date}</td>
+<td class="py-3 px-4 font-mono font-bold">${d.branch}</td>
+<td class="py-3 px-4">${d.name}</td>
+<td class="py-3 px-4 text-center">${d.hasOpen ? '<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-sky-500/20 text-sky-400 text-lg">✓</span>' : '-'}</td>
+<td class="py-3 px-4 text-center">${d.hasCount ? '<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 text-lg">✓</span>' : '-'}</td>
+<td class="py-3 px-4 text-center">${d.hasClose ? '<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 text-lg">✓</span>' : '-'}</td>
+<td class="py-3 px-4 text-center"><span class="px-3 py-1 rounded-full text-xs font-bold ${ok ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}">${ok ? '✓ ครบถ้วน' : '✗ ไม่ครบ'}</span></td>
+</tr>`;
+}).join('');
+}
+
+// Update Statistics
+function updateStats() {
+const t = filteredData.length, s = filteredData.filter(r => r.status === 'completed').length, f = t - s;
+document.getElementById('statTotal').innerText = t;
+document.getElementById('statSuccess').innerText = s;
+document.getElementById('statFailed').innerText = f;
+document.getElementById('statPercent').innerText = (t > 0 ? Math.round((s/t)*100) : 0) + '%';
+}
+
+// Render Charts
+function renderCharts() {
+const s = filteredData.filter(r => r.status === 'completed').length, f = filteredData.length - s;
+const c1 = document.getElementById('successChart').getContext('2d');
+if (chart1) chart1.destroy();
+chart1 = new Chart(c1, {
+type: 'doughnut',
+data: { labels: ['สำเร็จ', 'ไม่สำเร็จ'], datasets: [{ data: [s, f], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }] },
+options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } } }
+});
+const types = {};
+filteredData.forEach(r => { types[r.type] = (types[r.type]||0)+1; });
+const c2 = document.getElementById('typeChart').getContext('2d');
+if (chart2) chart2.destroy();
+chart2 = new Chart(c2, {
+type: 'bar',
+data: { labels: Object.keys(types), datasets: [{ label: 'จำนวน', data: Object.values(types), backgroundColor: ['#38bdf8','#10b981','#f59e0b'], borderRadius: 6 }] },
+options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { color: '#94a3b8' } }, x: { ticks: { color: '#94a3b8' } } }, plugins: { legend: { display: false } } }
+});
+}
+
+// Export PDF
+function exportPDF() {
+const { jsPDF } = window.jspdf;
+const doc = new jsPDF();
+doc.setFontSize(16);
+doc.text("Daily Video Summary Report", 105, 15, { align: "center" });
+doc.setFontSize(10);
+doc.text("Generated: " + new Date().toLocaleString('th-TH'), 105, 22, { align: "center" });
+const sum = {}, data = [];
+filteredData.forEach(r => {
+const k = (r.dateOnly||"")+"|"+r.branch;
+if (!sum[k]) sum[k] = { date: r.dateOnly||"-", branch: r.branch, name: r.name, types: {}, status: [] };
+sum[k].types[r.type] = (sum[k].types[r.type]||0)+1;
+sum[k].status.push(r.status);
+});
+Object.values(sum).forEach(d => {
+const o = d.types['เปิดเซฟ']||0, c = d.types['นับเงิน']||0, cl = d.types['ปิดเซฟ']||0;
+const sc = d.status.filter(s=>s==='completed').length;
+data.push([d.date, d.branch, d.name, o, c, cl, sc+'/'+d.status.length, (o>0&&c>0&&cl>0)?"Complete":"Incomplete"]);
+});
+doc.autoTable({
+startY: 30,
+head: [['Date','Branch','Name','Open','Count','Close','Success','Status']],
+body: data,
+theme: 'grid',
+headStyles: { fillColor: [41,128,185], textColor: 255 },
+styles: { fontSize: 8 }
+});
+doc.save('report_'+new Date().toISOString().split('T')[0]+'.pdf');
+}
+
+// Open Video Preview
+function openPreview(url, title) {
+if (!url) { alert('ไม่มีลิงก์วิดีโอ'); return; }
+let embed = url;
+if (url.includes('/file/d/')) {
+const id = url.split('/file/d/')[1].split('/')[0];
+embed = `https://drive.google.com/file/d/${id}/preview`;
+}
+document.getElementById('videoContent').innerHTML = `
+<iframe src="${embed}" class="w-full aspect-video border-0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+<div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+<p class="font-bold">${title}</p>
+<a href="${url}" target="_blank" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">📥 เปิดใน Drive</a>
+</div>
+`;
+document.getElementById('videoModal').style.display = 'flex';
+document.body.style.overflow = 'hidden';
+}
+
+// Close Modal
+function closeModal(e) {
+if (!e || e.target.id === 'videoModal') {
+document.getElementById('videoContent').innerHTML = '';
+document.getElementById('videoModal').style.display = 'none';
+document.body.style.overflow = 'auto';
+}
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// Init
+window.onload = refreshData;
+</script>
+</body>
+</html>
