@@ -1,256 +1,118 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOP Video Recorder - Thailand Post</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@400;600;700&display=swap');
-        
-        :root {
-            --bg-light: #f1f5f9;
-            --card-light: #ffffff;
-            --text-light: #0f172a;
-            --bg-dark: #0f172a;
-            --card-dark: #1e293b;
-            --text-dark: #f1f5f9;
-        }
+<!-- (ส่วน Head, Style, HTML ยังคงเดิมทุกประการ) -->
+<script>
+let recorder, stream, chunks = [];
+let isRecording = false;
+const API_URL = "https://script.google.com/macros/s/AKfycbz3KuaPfiiKUs--zHzay55h6qisIFYmJL2M6-fo0fFjgMfeWcompBHgMO0_0XhJrzW4aQ/exec";
+const statusEl = document.getElementById('status');
+const previewEl = document.getElementById('preview');
+const recBadge = document.getElementById('recBadge');
+const uploadOverlay = document.getElementById('uploadOverlay');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
 
-        body { font-family: 'Anuphan', sans-serif; transition: all 0.3s ease; min-height: 100vh; }
-        
-        body.light { background-color: var(--bg-light); color: var(--text-light); }
-        .light .glass-card { background: var(--card-light); border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
-        .light input, .light select { background: #f8fafc; border: 2px solid #cbd5e1; color: #0f172a; }
+document.getElementById('date').valueAsDate = new Date();
 
-        body.dark { background-color: var(--bg-dark); color: var(--text-dark); }
-        .dark .glass-card { background: var(--card-dark); border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5); }
-        .dark input, .dark select { background: #0f172a; border: 2px solid #334155; color: white; }
+async function startCamera() {
+  if (isRecording) return;
+  if(!document.getElementById('name').value || !document.getElementById('branch').value) {
+    alert("กรุณากรอกชื่อและสาขาก่อนเริ่มครับ"); return;
+  }
+  try {
+    statusEl.innerText = "กำลังเข้าถึงกล้อง...";
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: true
+    });
+    previewEl.srcObject = stream;
+    await previewEl.play();
+    
+    recorder = new MediaRecorder(stream, {
+      mimeType: 'video/webm;codecs=vp8',
+      videoBitsPerSecond: 1200000
+    });
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = handleStop;
+    recorder.start();
+    isRecording = true;
+    
+    recBadge.classList.remove('hidden');
+    statusEl.innerText = "🔴 กำลังบันทึกวิดีโอ...";
+    statusEl.classList.add('text-red-400');
+    startBtn.disabled = true; startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    stopBtn.disabled = false; stopBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+  } catch (e) {
+    console.error(e);
+    alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตสิทธิ์การใช้กล้อง");
+    statusEl.innerText = "สถานะ: กล้องขัดข้อง";
+  }
+}
 
-        .btn-record { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .btn-record:active { transform: scale(0.95); }
-        .recording-dot { animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-    </style>
-</head>
-<body class="dark flex flex-col items-center justify-center p-4">
+function stopCamera() {
+  if (!isRecording) return;
+  recorder.stop();
+  stream.getTracks().forEach(t => t.stop());
+  isRecording = false;
+  recBadge.classList.add('hidden');
+  uploadOverlay.style.display = 'flex';
+  statusEl.innerText = "🔄 กำลังเตรียมไฟล์...";
+  statusEl.classList.remove('text-red-400');
+  stopBtn.disabled = true; stopBtn.classList.add('opacity-50', 'cursor-not-allowed');
+}
 
-    <!-- ปุ่มสลับโหมด (มุมขวาบน) -->
-    <div class="fixed top-4 right-4 flex gap-2 bg-black/20 p-1 rounded-xl backdrop-blur-md">
-        <button onclick="setTheme('light')" id="lightBtn" class="p-2 rounded-lg transition-all">☀️</button>
-        <button onclick="setTheme('dark')" id="darkBtn" class="p-2 rounded-lg transition-all">🌙</button>
-    </div>
+function handleStop() {
+  const blob = new Blob(chunks, { type: "video/webm" });
+  previewEl.srcObject = null;
+  previewEl.src = URL.createObjectURL(blob);
+  previewEl.controls = true;
+  upload(blob);
+  chunks = [];
+}
 
-    <div class="max-w-md w-full glass-card p-8 relative overflow-hidden">
-        <!-- แถบสีด้านบนแยกตามสถานะ -->
-        <div id="topBar" class="absolute top-0 left-0 w-full h-2 bg-sky-500"></div>
+async function upload(blob) {
+  // 🔧 เพิ่มการตรวจสอบขนาดไฟล์เพื่อป้องกัน GAS Limit (50MB)
+  if (blob.size > 30 * 1024 * 1024) {
+    alert("ขนาดไฟล์เกิน 30MB ระบบอาจอัปโหลดไม่สำเร็จ กรุณาบันทึกคลิปให้สั้นลง");
+    resetUI(); return;
+  }
 
-        <header class="text-center mb-8">
-            <h1 class="text-3xl font-black italic tracking-tighter text-sky-500">SOP RECORDER</h1>
-            <p class="opacity-60 text-xs font-bold uppercase tracking-widest mt-1">ระบบบันทึกวิดีโอปฏิบัติงาน</p>
-        </header>
+  const reader = new FileReader();
+  reader.readAsDataURL(blob);
+  reader.onloadend = async () => {
+    const base64 = reader.result.split(',')[1];
+    const params = new URLSearchParams();
+    params.append("name", document.getElementById("name").value);
+    params.append("branch", document.getElementById("branch").value);
+    params.append("date", document.getElementById("date").value);
+    params.append("type", document.getElementById("type").value);
+    params.append("video", base64);
 
-        <!-- ฟอร์มข้อมูล -->
-        <div class="space-y-5 mb-8">
-            <div>
-                <label class="text-[10px] font-bold uppercase mb-1 block opacity-50">รหัสไปรษณีย์ (5 หลัก)</label>
-                <input type="text" id="branchCode" maxlength="5" placeholder="เช่น 15220" 
-                    class="w-full rounded-2xl px-5 py-4 text-xl font-bold outline-none focus:ring-4 focus:ring-sky-500/20 transition-all">
-            </div>
-            <div>
-                <label class="text-[10px] font-bold uppercase mb-1 block opacity-50">ชื่อผู้ทำการบันทึก</label>
-                <input type="text" id="userName" placeholder="ระบุชื่อ-นามสกุล" 
-                    class="w-full rounded-2xl px-5 py-4 text-lg font-bold outline-none focus:ring-4 focus:ring-sky-500/20 transition-all">
-            </div>
-            <div>
-                <label class="text-[10px] font-bold uppercase mb-1 block opacity-50">ประเภทกิจกรรม</label>
-                <select id="workType" class="w-full rounded-2xl px-5 py-4 text-lg font-bold outline-none appearance-none cursor-pointer">
-                    <option value="เปิดเซฟ">🔓 เปิดเซฟ</option>
-                    <option value="นับเงิน">💰 นับเงิน</option>
-                    <option value="ปิดเซฟ">🔒 ปิดเซฟ</option>
-                </select>
-            </div>
-        </div>
+    try {
+      statusEl.innerText = "⏳ กำลังอัปโหลดไปยัง Drive...";
+      const res = await fetch(API_URL, {
+        method: "POST",
+        body: params.toString(),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
+      });
+      const result = await res.json();
+      if (result.status === "success") {
+        statusEl.innerText = "✅ บันทึกสำเร็จ";
+        statusEl.classList.add('text-emerald-400');
+        alert("อัปโหลดเรียบร้อยครับ!");
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (e) {
+      console.error(e);
+      statusEl.innerText = "❌ อัปโหลดไม่สำเร็จ";
+      alert("เกิดข้อผิดพลาดในการส่งข้อมูล: " + e.message);
+    } finally {
+      resetUI();
+    }
+  };
+}
 
-        <!-- กล้องพรีวิว -->
-        <div class="relative rounded-3xl overflow-hidden bg-black aspect-video mb-6 border-4 border-black/10 shadow-inner">
-            <video id="preview" autoplay muted playsinline class="w-full h-full object-cover"></video>
-            <div id="recordingLabel" class="hidden absolute top-4 left-4 bg-rose-600 px-3 py-1 rounded-full flex items-center gap-2 text-[10px] font-bold">
-                <div class="w-2 h-2 bg-white rounded-full recording-dot"></div> REC <span id="timer">00:00</span>
-            </div>
-        </div>
-
-        <!-- คำเตือนเวลา[cite: 1] -->
-        <div class="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl mb-8 flex items-start gap-3">
-            <span class="text-xl">⚠️</span>
-            <p class="text-[11px] leading-relaxed text-amber-600 dark:text-amber-400">
-                <b>คำแนะนำสำคัญ:</b> เพื่อความรวดเร็วในการส่งข้อมูล <br>
-                เวลาบันทึก <b>ไม่ควรเกิน 4 นาทีต่อคลิป</b>[cite: 1]
-            </p>
-        </div>
-
-        <!-- ปุ่มควบคุม -->
-        <div class="flex flex-col gap-3">
-            <button id="recordBtn" onclick="toggleRecording()" class="btn-record w-full py-5 rounded-3xl bg-rose-600 text-white font-black text-xl shadow-xl shadow-rose-600/30 hover:bg-rose-500 active:bg-rose-700">
-                เริ่มบันทึกวิดีโอ
-            </button>
-            <button id="downloadBtn" class="hidden w-full py-4 rounded-2xl bg-slate-700 text-white font-bold opacity-50 cursor-not-allowed">
-                กำลังบันทึก...
-            </button>
-        </div>
-
-        <!-- การ์ดแจ้งสถานะ (Status Card)[cite: 1] -->
-        <div id="statusCard" class="hidden mt-6 p-5 rounded-2xl border-2 flex items-center gap-4 transition-all">
-            <div id="statusIcon" class="text-3xl"></div>
-            <div>
-                <p id="statusTitle" class="font-bold text-sm"></p>
-                <p id="statusTime" class="text-[10px] opacity-60 mt-0.5"></p>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycby95PEoW7V25-Dcafcocb0debunJNpj4oZYacVVQaTGRgYXA7u8DuzxxCmcuWo3wDHqWw/exec"; // ใส่ URL ที่ได้จาก Web App ของ Google Apps Script[cite: 1]
-        let mediaRecorder;
-        let recordedChunks = [];
-        let startTime;
-        let timerInterval;
-
-        // 1. ระบบจัดการ Theme[cite: 1]
-        function setTheme(theme) {
-            document.body.className = theme;
-            localStorage.setItem('theme', theme);
-            const isDark = theme === 'dark';
-            document.getElementById('darkBtn').className = isDark ? 'p-2 rounded-lg bg-sky-500' : 'p-2 rounded-lg hover:bg-slate-200';
-            document.getElementById('lightBtn').className = !isDark ? 'p-2 rounded-lg bg-sky-500' : 'p-2 rounded-lg hover:bg-white/10';
-        }
-
-        // 2. การจัดการกล้อง
-        async function setupCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
-                document.getElementById('preview').srcObject = stream;
-                return stream;
-            } catch (err) {
-                alert("ไม่สามารถเข้าถึงกล้องได้: " + err.message);
-            }
-        }
-
-        // 3. เริ่ม/หยุด บันทึก[cite: 1]
-        async function toggleRecording() {
-            const btn = document.getElementById('recordBtn');
-            const branch = document.getElementById('branchCode').value;
-            const name = document.getElementById('userName').value;
-
-            if (!branch || !name) {
-                alert("กรุณาระบุรหัส ปณ. และชื่อผู้บันทึกให้ครบถ้วน");
-                return;
-            }
-
-            if (!mediaRecorder || mediaRecorder.state === "inactive") {
-                // START RECORDING
-                recordedChunks = [];
-                const stream = await setupCamera();
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-
-                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-                mediaRecorder.onstop = () => uploadVideo();
-
-                mediaRecorder.start();
-                btn.innerText = "🛑 หยุดการบันทึก";
-                btn.classList.replace('bg-rose-600', 'bg-slate-800');
-                document.getElementById('recordingLabel').classList.remove('hidden');
-                document.getElementById('topBar').classList.replace('bg-sky-500', 'bg-rose-600');
-                
-                startTimer();
-            } else {
-                // STOP RECORDING
-                mediaRecorder.stop();
-                btn.innerText = "กำลังประมวลผล...";
-                btn.disabled = true;
-                stopTimer();
-            }
-        }
-
-        // 4. ระบบจับเวลา
-        function startTimer() {
-            startTime = Date.now();
-            timerInterval = setInterval(() => {
-                const seconds = Math.floor((Date.now() - startTime) / 1000);
-                const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-                const s = (seconds % 60).toString().padStart(2, '0');
-                document.getElementById('timer').innerText = `${m}:${s}`;
-                
-                // แจ้งเตือนเมื่อใกล้ครบ 4 นาที[cite: 1]
-                if (seconds > 240) document.getElementById('timer').classList.add('text-rose-500');
-            }, 1000);
-        }
-
-        function stopTimer() {
-            clearInterval(timerInterval);
-            document.getElementById('recordingLabel').classList.add('hidden');
-        }
-
-        // 5. อัปโหลดวิดีโอและเปลี่ยนชื่อไฟล์[cite: 1]
-        async function uploadVideo() {
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            const reader = new FileReader();
-            
-            reader.onloadend = async () => {
-                const base64data = reader.result.split(',')[1];
-                const formData = new URLSearchParams();
-                formData.append('video', base64data);
-                formData.append('branch', document.getElementById('branchCode').value);
-                formData.append('name', document.getElementById('userName').value);
-                formData.append('type', document.getElementById('workType').value);
-                formData.append('date', new Date().toLocaleDateString('th-TH'));
-
-                try {
-                    const response = await fetch(API_URL, { method: 'POST', body: formData });
-                    const result = await response.json();
-                    if (result.status === "success") {
-                        showStatus(true, document.getElementById('workType').value);
-                    }
-                } catch (err) {
-                    showStatus(false, err.message);
-                }
-            };
-            reader.readAsDataURL(blob);
-        }
-
-        // 6. แสดงผลการ์ดสถานะ[cite: 1]
-        function showStatus(isSuccess, type) {
-            const card = document.getElementById('statusCard');
-            const icon = document.getElementById('statusIcon');
-            const title = document.getElementById('statusTitle');
-            const time = document.getElementById('statusTime');
-            const btn = document.getElementById('recordBtn');
-
-            card.classList.remove('hidden');
-            if (isSuccess) {
-                card.className = "mt-6 p-5 rounded-2xl border-2 border-emerald-500/30 bg-emerald-500/10 flex items-center gap-4";
-                icon.innerText = "✅";
-                title.innerText = `บันทึกเสร็จ: ${type}`;[cite: 1]
-                title.className = "font-bold text-sm text-emerald-500";
-            } else {
-                card.className = "mt-6 p-5 rounded-2xl border-2 border-rose-500/30 bg-rose-500/10 flex items-center gap-4";
-                icon.innerText = "❌";
-                title.innerText = "เกิดข้อผิดพลาดในการอัปโหลด";
-                title.className = "font-bold text-sm text-rose-500";
-            }
-            time.innerText = `อัปเดตเมื่อ: ${new Date().toLocaleTimeString()}`;
-            
-            btn.disabled = false;
-            btn.innerText = "เริ่มบันทึกวิดีโอ";
-            btn.classList.replace('bg-slate-800', 'bg-rose-600');
-            document.getElementById('topBar').classList.replace('bg-rose-600', 'bg-sky-500');
-        }
-
-        // เริ่มต้นระบบ
-        window.onload = () => {
-            setTheme(localStorage.getItem('theme') || 'dark');
-            setupCamera();
-        };
-    </script>
-</body>
-</html>
+function resetUI() {
+  uploadOverlay.style.display = 'none';
+  startBtn.disabled = false; startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+}
+</script>
