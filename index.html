@@ -3,293 +3,257 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Recorder Pro</title>
+    <title>SOP Video Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600&display=swap');
-
-        body {
-            font-family: 'Anuphan', sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: #f1f5f9;
-            min-height: 100vh;
-        }
-
-        .glass-card {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        .video-container {
-            position: relative;
-            overflow: hidden;
-            border-radius: 1rem;
-            background: #000;
-            aspect-ratio: 4 / 3;
-        }
-
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .recording-dot {
-            width: 12px;
-            height: 12px;
-            background-color: #ef4444;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.3); opacity: 0.5; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        input, select {
-            background: rgba(15, 23, 42, 0.8) !important;
-            border: 1px solid #334155 !important;
-            color: white !important;
-            transition: all 0.3s;
-        }
-
-        input:focus, select:focus {
-            border-color: #38bdf8 !important;
-            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important;
-            outline: none;
-        }
-
-        .btn-start { background: linear-gradient(to right, #10b981, #059669); }
-        .btn-stop { background: linear-gradient(to right, #ef4444, #dc2626); }
-        
-        #uploadOverlay {
-            display: none;
-            background: rgba(15, 23, 42, 0.9);
-            position: absolute;
-            inset: 0;
-            z-index: 50;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            border-radius: 1rem;
-        }
+        body { font-family: 'Anuphan', sans-serif; transition: 0.3s; }
+        body.dark { background: #0f172a; color: #f1f5f9; }
+        body.light { background: #f8fafc; color: #1e293b; }
+        .glass-card { backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.5rem; }
+        .dark .glass-card { background: rgba(30, 41, 59, 0.7); }
+        .light .glass-card { background: white; border-color: #e2e8f0; }
+        #videoModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; align-items: center; justify-content: center; }
     </style>
 </head>
-<body class="flex items-center justify-center p-4">
+<body class="dark p-4 md:p-8">
 
-    <div class="glass-card w-full max-w-md rounded-3xl p-6 md:p-8">
-        <header class="text-center mb-6">
-            <h1 class="text-2xl font-bold tracking-tight text-white mb-2">📹 ระบบบันทึกวิดีโอ</h1>
-            <p class="text-slate-400 text-sm">กรุณากรอกข้อมูลให้ครบถ้วนก่อนเริ่มบันทึก</p>
+    <div class="max-w-6xl mx-auto">
+        <!-- Header Section -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold italic tracking-tighter text-sky-500">SOP SYSTEM DASHBOARD</h1>
+                <p class="text-slate-400 text-sm">ระบบสรุปผลและตรวจสอบการบันทึกวิดีโอรายวัน</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="toggleMode()" id="modeBtn" class="bg-amber-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg transition hover:scale-105">☀️ โหมดสว่าง</button>
+                <button onclick="exportPDF()" class="bg-rose-600 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg transition hover:scale-105">📄 โหลดรายงาน PDF</button>
+            </div>
         </header>
 
-        <div class="space-y-4">
-            <!-- Form Fields -->
-            <div class="grid grid-cols-2 gap-4">
-                <div class="col-span-2">
-                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1 ml-1">ชื่อผู้ดำเนินการ</label>
-                    <input id="name" type="text" placeholder="ระบุชื่อ-นามสกุล" class="w-full px-4 py-3 rounded-xl">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1 ml-1">สาขา</label>
-                    <input id="branch" type="text" placeholder="รหัสสาขา" class="w-full px-4 py-3 rounded-xl">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1 ml-1">วันที่</label>
-                    <input id="date" type="date" class="w-full px-4 py-3 rounded-xl">
+        <!-- Filter & Stats Section -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <!-- Search Filter -->
+            <div class="glass-card p-6 flex flex-col justify-center">
+                <label class="text-[10px] uppercase font-bold text-slate-500 mb-2">ค้นหารหัส ปณ. / วันที่</label>
+                <input type="text" id="searchBranch" onkeyup="filterTable()" placeholder="รหัส ปณ. 5 หลัก..." class="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-sky-500 mb-2">
+                <input type="date" id="searchDate" onchange="filterTable()" class="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-sky-500">
+            </div>
+
+            <!-- % Success Chart -->
+            <div class="glass-card p-4 flex flex-col items-center">
+                <p class="text-[10px] font-bold text-slate-500 uppercase mb-2">อัตราความสำเร็จวันนี้</p>
+                <div class="relative w-24 h-24">
+                    <canvas id="percentChart"></canvas>
+                    <div id="percentText" class="absolute inset-0 flex items-center justify-center font-bold text-lg">0%</div>
                 </div>
             </div>
 
-            <div>
-                <label class="block text-xs font-semibold text-slate-400 uppercase mb-1 ml-1">ประเภทการทำงาน</label>
-                <select id="type" class="w-full px-4 py-3 rounded-xl">
-                    <option value="OPEN_SAFE">📂 เปิดตู้นิรภัย</option>
-                    <option value="CHECK_CASH">💵 ตรวจสอบเงินสด</option>
-                    <option value="CLOSE_SAFE">🔒 ปิดตู้นิรภัย</option>
-                </select>
+            <!-- Daily Activity Chart[cite: 1] -->
+            <div class="glass-card p-4 md:col-span-2">
+                <canvas id="dailyChart" height="100"></canvas>
             </div>
+        </div>
 
-            <!-- Preview Area -->
-            <div class="video-container shadow-2xl">
-                <video id="preview" autoplay muted playsinline></video>
-                
-                <!-- Uploading Overlay -->
-                <div id="uploadOverlay">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mb-4"></div>
-                    <p class="text-sky-400 font-medium">กำลังส่งข้อมูล...</p>
-                </div>
-
-                <!-- Recording Badge -->
-                <div id="recBadge" class="hidden absolute top-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold border border-red-500/50">
-                    <span class="recording-dot"></span> RECORDING
-                </div>
+        <!-- Summary Status Table[cite: 1] -->
+        <div class="glass-card overflow-hidden shadow-2xl">
+            <div class="p-5 border-b border-white/5 flex justify-between items-center">
+                <h3 class="font-bold">📋 สรุปสถานะรายสาขา (3 งานหลัก)[cite: 1]</h3>
+                <span class="text-[10px] text-slate-500 italic">* อัปเดตล่าสุดอัตโนมัติ</span>
             </div>
-
-            <!-- Status Bar -->
-            <div id="status" class="text-center py-2 text-sm font-medium text-slate-400 bg-slate-800/50 rounded-lg">
-                สถานะ: พร้อมใช้งาน
-            </div>
-
-            <!-- Controls -->
-            <div class="flex gap-3">
-                <button id="startBtn" onclick="startCamera()" class="btn-start flex-1 py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 hover:opacity-90 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M232,128a104,104,0,1,1-104-104A104.11,104.11,0,0,1,232,128Z" opacity="0.2"></path><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm48-88a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h72A8,8,0,0,1,176,128Z" display="none"></path><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-92.68-40-24A8,8,0,0,0,112,106v48a8,8,0,0,0,12.44,6.68l40-24a8,8,0,0,0,0-13.36ZM128,140.5V115.5l20.83,12.5Z"></path></svg>
-                    เริ่มบันทึก
-                </button>
-                <button id="stopBtn" onclick="stopCamera()" disabled class="btn-stop flex-1 py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 opacity-50 cursor-not-allowed transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M216,128a88,88,0,1,1-88-88A88.1,88.1,0,0,1,216,128Z" opacity="0.2"></path><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm32-88a8,8,0,0,1-8,8H104a8,8,0,0,1-8-8V104a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8Z"></path></svg>
-                    หยุดและส่ง
-                </button>
+            <div class="overflow-x-auto">
+                <table id="mainTable" class="w-full text-left border-collapse">
+                    <thead class="bg-slate-500/5 text-[11px] uppercase font-bold text-slate-400">
+                        <tr>
+                            <th class="py-4 px-6">รหัส ปณ.[cite: 1]</th>
+                            <th class="py-4 px-6 text-center">เปิดเซฟ[cite: 1]</th>
+                            <th class="py-4 px-6 text-center">นับเงิน[cite: 1]</th>
+                            <th class="py-4 px-6 text-center">ปิดเซฟ[cite: 1]</th>
+                            <th class="py-4 px-6 text-center">สถานะรวม[cite: 1]</th>
+                            <th class="py-4 px-6 text-right">แอคชั่น</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryBody" class="divide-y divide-slate-500/10 text-sm">
+                        <tr><td colspan="6" class="py-20 text-center text-slate-500 italic">กำลังดึงข้อมูลจากระบบ...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
+    <!-- Video Preview Modal[cite: 1] -->
+    <div id="videoModal" onclick="closeModal()">
+        <div id="modalContent" class="bg-slate-900 rounded-3xl overflow-hidden max-w-3xl w-full relative mx-4 border border-white/10 shadow-2xl" onclick="event.stopPropagation()"></div>
+    </div>
+
     <script>
-        let recorder, stream, chunks = [];
-        let isRecording = false;
+        const API_URL = "https://script.google.com/macros/s/AKfycbxiaCaMsu1glS9FxbvpzxfZMUIenuzGZMY3gJcBTmLdB3hfE2TLt0LeJcTONV4YAFvtSQ/exec";
+        let allData = [];
+        let charts = {};
 
-        // 🔥 ใส่ URL Apps Script ของคุณที่นี่
-        const API_URL = "https://script.google.com/macros/s/AKfycbyHPqUwJyOk3Xk3VEKbi6rF1vquJLedB97FYNaYmlRVq6zF7gNVxh_MwkX4-vEQcf-9QQ/exec";
-
-        const statusEl = document.getElementById('status');
-        const previewEl = document.getElementById('preview');
-        const recBadge = document.getElementById('recBadge');
-        const uploadOverlay = document.getElementById('uploadOverlay');
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-
-        // ตั้งค่าวันที่ปัจจุบันเป็น Default
-        document.getElementById('date').valueAsDate = new Date();
-
-        async function startCamera() {
-            if (isRecording) return;
-
-            // ตรวจสอบข้อมูลก่อนเริ่ม
-            if(!document.getElementById('name').value || !document.getElementById('branch').value) {
-                alert("กรุณากรอกชื่อและสาขาก่อนเริ่มครับ");
-                return;
+        function toggleMode() {
+            const body = document.body;
+            const btn = document.getElementById('modeBtn');
+            if (body.classList.contains('dark')) {
+                body.classList.replace('dark', 'light');
+                btn.innerText = "🌙 โหมดมืด";
+            } else {
+                body.classList.replace('light', 'dark');
+                btn.innerText = "☀️ โหมดสว่าง";
             }
+        }
 
+        async function refreshData() {
             try {
-                statusEl.innerText = "กำลังเข้าถึงกล้อง...";
-                
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, // ใช้กล้องหลังถ้าเป็นมือถือ
-                    audio: true 
-                });
-
-                previewEl.srcObject = stream;
-                await previewEl.play();
-
-                recorder = new MediaRecorder(stream, {
-                    mimeType: 'video/webm;codecs=vp8',
-                    videoBitsPerSecond: 1200000 // ประมาณ 1.2 Mbps เพื่อประหยัดพื้นที่
-                });
-
-                recorder.ondataavailable = e => {
-                    if (e.data.size > 0) chunks.push(e.data);
-                };
-
-                recorder.onstop = handleStop;
-
-                recorder.start();
-                isRecording = true;
-
-                // UI Update
-                recBadge.classList.remove('hidden');
-                statusEl.innerText = "🔴 กำลังบันทึกวิดีโอ...";
-                statusEl.classList.add('text-red-400');
-                
-                startBtn.disabled = true;
-                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                stopBtn.disabled = false;
-                stopBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-
+                const res = await fetch(`${API_URL}?action=getList`);
+                const data = await res.json();
+                if (data.status === "success") {
+                    allData = data.rows;
+                    processDashboard(data.rows, data.stats);
+                }
             } catch (e) {
-                console.error(e);
-                alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตสิทธิ์การใช้กล้อง");
-                statusEl.innerText = "สถานะ: กล้องขัดข้อง";
+                console.error("Fetch Error:", e);
             }
         }
 
-        function stopCamera() {
-            if (!isRecording) return;
-
-            recorder.stop();
-            stream.getTracks().forEach(t => t.stop());
-            isRecording = false;
-
-            // UI Update
-            recBadge.classList.add('hidden');
-            uploadOverlay.style.display = 'flex';
-            statusEl.innerText = "🔄 กำลังเตรียมไฟล์...";
-            statusEl.classList.remove('text-red-400');
-            
-            stopBtn.disabled = true;
-            stopBtn.classList.add('opacity-50', 'cursor-not-allowed');
-        }
-
-        function handleStop() {
-            const blob = new Blob(chunks, { type: "video/webm" });
-            
-            // แสดงวิดีโอที่เพิ่งอัดเสร็จ
-            previewEl.srcObject = null;
-            previewEl.src = URL.createObjectURL(blob);
-            previewEl.controls = true;
-
-            upload(blob);
-            chunks = [];
-        }
-
-        async function upload(blob) {
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-
-            reader.onloadend = async () => {
-                const base64 = reader.result.split(',')[1];
+        function processDashboard(rows, stats) {
+            // 1. ประมวลผลสถานะ 3 งานหลักแยกตาม ปณ.[cite: 1]
+            const summary = {};
+            rows.forEach(r => {
+                const branch = r.branch.toString();
+                if (!summary[branch]) summary[branch] = { open: null, count: null, close: null, name: r.name };
                 
-                const params = new URLSearchParams();
-                params.append("name", document.getElementById("name").value);
-                params.append("branch", document.getElementById("branch").value);
-                params.append("date", document.getElementById("date").value);
-                params.append("type", document.getElementById("type").value);
-                params.append("video", base64);
+                if (r.type.includes("เปิดเซฟ")) summary[branch].open = r.videoUrl;
+                if (r.type.includes("นับเงิน")) summary[branch].count = r.videoUrl;
+                if (r.type.includes("ปิดเซฟ")) summary[branch].close = r.videoUrl;
+            });
 
-                try {
-                    statusEl.innerText = "⏳ กำลังอัปโหลดไปยัง Drive...";
+            // 2. แสดงผลในตาราง[cite: 1]
+            const tbody = document.getElementById('summaryBody');
+            const branchKeys = Object.keys(summary);
+            
+            if (branchKeys.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-10 text-center text-slate-500">ไม่พบข้อมูล</td></tr>';
+            } else {
+                tbody.innerHTML = branchKeys.map(key => {
+                    const s = summary[key];
+                    const isComplete = s.open && s.count && s.close;
+                    const statusClass = isComplete ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20';
                     
-                    const res = await fetch(API_URL, {
-                        method: "POST",
-                        body: params.toString(),
-                        headers: { "Content-Type": "application/x-www-form-urlencoded" }
-                    });
+                    return `
+                        <tr class="hover:bg-slate-500/5 transition">
+                            <td class="py-4 px-6 font-bold text-sky-500">${key}</td>
+                            <td class="py-4 px-6 text-center">${s.open ? '✅' : '❌'}</td>
+                            <td class="py-4 px-6 text-center">${s.count ? '✅' : '❌'}</td>
+                            <td class="py-4 px-6 text-center">${s.close ? '✅' : '❌'}</td>
+                            <td class="py-4 px-6 text-center">
+                                <span class="px-3 py-1 rounded-full text-[10px] font-bold border ${statusClass}">
+                                    ${isComplete ? 'ครบ 3 สถานะ' : 'ยังไม่ครบ[cite: 1]'}
+                                </span>
+                            </td>
+                            <td class="py-4 px-6 text-right">
+                                <button onclick="alert('สาขานี้: ${s.name}')" class="text-slate-500 hover:text-white transition">ℹ️</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
 
-                    const result = await res.json();
-
-                    if (result.status === "success") {
-                        statusEl.innerText = "✅ บันทึกสำเร็จ";
-                        statusEl.classList.add('text-emerald-400');
-                        alert("อัปโหลดเรียบร้อยครับ!");
-                    } else {
-                        throw new Error(result.message);
-                    }
-                } catch (e) {
-                    console.error(e);
-                    statusEl.innerText = "❌ อัปโหลดไม่สำเร็จ";
-                    alert("เกิดข้อผิดพลาดในการส่งข้อมูล: " + e.message);
-                } finally {
-                    uploadOverlay.style.display = 'none';
-                    startBtn.disabled = false;
-                    startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                }
-            };
+            updateCharts(stats, summary);
         }
+
+        function updateCharts(stats, summary) {
+            // กราฟ % ความสำเร็จ[cite: 1]
+            const totalBranch = Object.keys(summary).length;
+            const completeBranch = Object.values(summary).filter(s => s.open && s.count && s.close).length;
+            const percent = totalBranch > 0 ? Math.round((completeBranch / totalBranch) * 100) : 0;
+            document.getElementById('percentText').innerText = percent + "%";
+
+            if (charts.percent) charts.percent.destroy();
+            charts.percent = new Chart(document.getElementById('percentChart'), {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [percent, 100 - percent],
+                        backgroundColor: ['#0ea5e9', '#1e293b'],
+                        borderWidth: 0,
+                        circumference: 360,
+                        rotation: 0
+                    }]
+                },
+                options: { cutout: '85%', plugins: { legend: { display: false } } }
+            });
+
+            // กราฟรายวัน (7 วันย้อนหลัง)[cite: 1]
+            const labels = Object.keys(stats.byDate).reverse().slice(-7);
+            const values = labels.map(l => stats.byDate[l]);
+
+            if (charts.daily) charts.daily.destroy();
+            charts.daily = new Chart(document.getElementById('dailyChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'จำนวนคลิป',
+                        data: values,
+                        backgroundColor: '#0ea5e9',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
+                        x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function filterTable() {
+            const branchVal = document.getElementById('searchBranch').value.toLowerCase();
+            const rows = document.querySelectorAll('#summaryBody tr');
+            
+            rows.forEach(row => {
+                const branchText = row.cells[0].innerText.toLowerCase();
+                row.style.display = branchText.includes(branchVal) ? '' : 'none';
+            });
+        }
+
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFontSize(18);
+            doc.text("SOP Video System - Daily Report", 14, 20);
+            doc.setFontSize(10);
+            doc.text(`Report Date: ${new Date().toLocaleString()}`, 14, 28);
+            
+            doc.autoTable({
+                html: '#mainTable',
+                startY: 35,
+                theme: 'grid',
+                headStyles: { fillColor: [14, 165, 233] },
+                columns: [
+                    { header: 'Branch ID', dataKey: 'branch' },
+                    { header: 'Open', dataKey: 'open' },
+                    { header: 'Count', dataKey: 'count' },
+                    { header: 'Close', dataKey: 'close' },
+                    { header: 'Status', dataKey: 'status' }
+                ]
+            });
+            doc.save(`SOP_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+        }
+
+        function closeModal() {
+            document.getElementById('videoModal').style.display = 'none';
+            document.getElementById('modalContent').innerHTML = '';
+        }
+
+        window.onload = refreshData;
     </script>
 </body>
 </html>
