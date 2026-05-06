@@ -7,17 +7,56 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600&display=swap');
-body { font-family: 'Anuphan', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; }
-.glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-.video-container { position: relative; overflow: hidden; border-radius: 1rem; background: #000; aspect-ratio: 4 / 3; }
+body {
+  font-family: 'Anuphan', sans-serif;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #f1f5f9;
+  min-height: 100vh;
+}
+.glass-card {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+.video-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #000;
+  aspect-ratio: 4 / 3;
+}
 video { width: 100%; height: 100%; object-fit: cover; }
-.recording-dot { width: 12px; height: 12px; background-color: #ef4444; border-radius: 50%; display: inline-block; margin-right: 8px; animation: pulse 1.5s infinite; }
-@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
-input, select { background: rgba(15, 23, 42, 0.8) !important; border: 1px solid #334155 !important; color: white !important; transition: all 0.3s; }
-input:focus, select:focus { border-color: #38bdf8 !important; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important; outline: none; }
+.recording-dot {
+  width: 12px; height: 12px; background-color: #ef4444;
+  border-radius: 50%; display: inline-block; margin-right: 8px;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+input, select {
+  background: rgba(15, 23, 42, 0.8) !important;
+  border: 1px solid #334155 !important;
+  color: white !important;
+  transition: all 0.3s;
+}
+input:focus, select:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important;
+  outline: none;
+}
 .btn-start { background: linear-gradient(to right, #10b981, #059669); }
 .btn-stop { background: linear-gradient(to right, #ef4444, #dc2626); }
-#uploadOverlay { display: none; background: rgba(15, 23, 42, 0.9); position: absolute; inset: 0; z-index: 50; flex-direction: column; align-items: center; justify-content: center; border-radius: 1rem; }
+#uploadOverlay {
+  display: none;
+  background: rgba(15, 23, 42, 0.9);
+  position: absolute; inset: 0; z-index: 50;
+  flex-direction: column; align-items: center; justify-content: center;
+  border-radius: 1rem;
+}
 </style>
 </head>
 <body class="flex items-center justify-center p-4">
@@ -26,6 +65,7 @@ input:focus, select:focus { border-color: #38bdf8 !important; box-shadow: 0 0 0 
     <h1 class="text-2xl font-bold tracking-tight text-white mb-2">📹 ระบบบันทึกวิดีโอ</h1>
     <p class="text-slate-400 text-sm">กรุณากรอกข้อมูลให้ครบถ้วนก่อนเริ่มบันทึก</p>
   </header>
+  
   <div class="space-y-4">
     <div class="grid grid-cols-2 gap-4">
       <div class="col-span-2">
@@ -41,14 +81,16 @@ input:focus, select:focus { border-color: #38bdf8 !important; box-shadow: 0 0 0 
         <input id="date" type="date" class="w-full px-4 py-3 rounded-xl">
       </div>
     </div>
+
     <div>
       <label class="block text-xs font-semibold text-slate-400 uppercase mb-1 ml-1">ประเภทการทำงาน</label>
       <select id="type" class="w-full px-4 py-3 rounded-xl">
-        <option value="เปิดเซฟ"> เปิดเซฟ</option>
+        <option value="เปิดเซฟ">📂 เปิดเซฟ</option>
         <option value="นับเงิน">💵 นับเงิน</option>
         <option value="ปิดเซฟ">🔒 ปิดเซฟ</option>
       </select>
     </div>
+
     <div class="video-container shadow-2xl">
       <video id="preview" autoplay muted playsinline></video>
       <div id="uploadOverlay">
@@ -59,23 +101,28 @@ input:focus, select:focus { border-color: #38bdf8 !important; box-shadow: 0 0 0 
         <span class="recording-dot"></span> RECORDING
       </div>
     </div>
-    <div id="status" class="text-center py-2 text-sm font-medium text-slate-400 bg-slate-800/50 rounded-lg">สถานะ: พร้อมใช้งาน</div>
+
+    <div id="status" class="text-center py-2 text-sm font-medium text-slate-400 bg-slate-800/50 rounded-lg">
+      สถานะ: พร้อมใช้งาน
+    </div>
+
     <div class="flex gap-3">
       <button id="startBtn" onclick="startCamera()" class="btn-start flex-1 py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 hover:opacity-90 transition">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M232,128a104,104,0,1,1-104-104A104.11,104.11,0,0,1,232,128Z" opacity="0.2"></path><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm48-88a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h72A8,8,0,0,1,176,128Z" display="none"></path><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-92.68-40-24A8,8,0,0,0,112,106v48a8,8,0,0,0,12.44,6.68l40-24a8,8,0,0,0,0-13.36ZM128,140.5V115.5l20.83,12.5Z"></path></svg>
         เริ่มบันทึก
       </button>
       <button id="stopBtn" onclick="stopCamera()" disabled class="btn-stop flex-1 py-4 rounded-2xl font-bold text-white shadow-lg flex items-center justify-center gap-2 opacity-50 cursor-not-allowed transition">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M216,128a88,88,0,1,1-88-88A88.1,88.1,0,0,1,216,128Z" opacity="0.2"></path><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm32-88a8,8,0,0,1-8,8H104a8,8,0,0,1-8-8V104a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8Z"></path></svg>
         หยุดและส่ง
       </button>
     </div>
   </div>
 </div>
+
 <script>
 let recorder, stream, chunks = [];
 let isRecording = false;
-const API_URL = "https://script.google.com/macros/s/AKfycbx5Ye-IGJ5qaZUQHu3zj19kk-8sN8UtyknGj-s8ibdGr7JYISDCJMq1PWenuFHNc-i0eA/exec";
+let currentMimeType = 'video/webm'; // ตัวแปรเก็บประเภทไฟล์
+
+const API_URL = "https://script.google.com/macros/s/AKfycbyHPqUwJyOk3Xk3VEKbi6rF1vquJLedB97FYNaYmlRVq6zF7gNVxh_MwkX4-vEQcf-9QQ/exec";
 const statusEl = document.getElementById('status');
 const previewEl = document.getElementById('preview');
 const recBadge = document.getElementById('recBadge');
@@ -93,35 +140,69 @@ async function startCamera() {
   }
   try {
     statusEl.innerText = "กำลังเข้าถึงกล้อง...";
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: true });
-    previewEl.srcObject = stream; await previewEl.play();
-    recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 1200000 });
-    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop = handleStop; recorder.start(); isRecording = true;
-    recBadge.classList.remove('hidden'); statusEl.innerText = "🔴 กำลังบันทึกวิดีโอ..."; statusEl.classList.add('text-red-400');
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: true
+    });
+    previewEl.srcObject = stream;
+    await previewEl.play();
+    
+    //  ตรวจสอบว่าเครื่องรองรับ MP4 หรือไม่
+    if (MediaRecorder.isTypeSupported('video/mp4')) {
+      currentMimeType = 'video/mp4';
+    } else {
+      currentMimeType = 'video/webm';
+    }
+    
+    recorder = new MediaRecorder(stream, {
+      mimeType: currentMimeType,
+      videoBitsPerSecond: 2500000 // ปรับ Bitrate ให้ภาพชัดเจนขึ้น
+    });
+    recorder.ondataavailable = e => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    recorder.onstop = handleStop;
+    recorder.start();
+    isRecording = true;
+    
+    recBadge.classList.remove('hidden');
+    statusEl.innerText = "🔴 กำลังบันทึก (" + currentMimeType + ")";
+    statusEl.classList.add('text-red-400');
     startBtn.disabled = true; startBtn.classList.add('opacity-50', 'cursor-not-allowed');
     stopBtn.disabled = false; stopBtn.classList.remove('opacity-50', 'cursor-not-allowed');
   } catch (e) {
-    console.error(e); alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตสิทธิ์การใช้กล้อง");
+    console.error(e);
+    alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตสิทธิ์การใช้กล้อง");
     statusEl.innerText = "สถานะ: กล้องขัดข้อง";
   }
 }
 
 function stopCamera() {
   if (!isRecording) return;
-  recorder.stop(); stream.getTracks().forEach(t => t.stop()); isRecording = false;
-  recBadge.classList.add('hidden'); uploadOverlay.style.display = 'flex'; statusEl.innerText = "🔄 กำลังเตรียมไฟล์..."; statusEl.classList.remove('text-red-400');
+  recorder.stop();
+  stream.getTracks().forEach(t => t.stop());
+  isRecording = false;
+  
+  recBadge.classList.add('hidden');
+  uploadOverlay.style.display = 'flex';
+  statusEl.innerText = "🔄 กำลังเตรียมไฟล์...";
+  statusEl.classList.remove('text-red-400');
   stopBtn.disabled = true; stopBtn.classList.add('opacity-50', 'cursor-not-allowed');
 }
 
 function handleStop() {
-  const blob = new Blob(chunks, { type: "video/webm" });
-  previewEl.srcObject = null; previewEl.src = URL.createObjectURL(blob); previewEl.controls = true;
-  upload(blob); chunks = [];
+  // 🔧 ใช้ mimeType ที่เลือกไว้ตอนบันทึก
+  const blob = new Blob(chunks, { type: currentMimeType });
+  previewEl.srcObject = null;
+  previewEl.src = URL.createObjectURL(blob);
+  previewEl.controls = true;
+  upload(blob);
+  chunks = [];
 }
 
 async function upload(blob) {
-  const reader = new FileReader(); reader.readAsDataURL(blob);
+  const reader = new FileReader();
+  reader.readAsDataURL(blob);
   reader.onloadend = async () => {
     const base64 = reader.result.split(',')[1];
     const params = new URLSearchParams();
@@ -130,19 +211,31 @@ async function upload(blob) {
     params.append("date", document.getElementById("date").value);
     params.append("type", document.getElementById("type").value);
     params.append("video", base64);
+    params.append("mimeType", currentMimeType); // 🔧 ส่งประเภทไฟล์ไปที่ Google Script
+
     try {
-      statusEl.innerText = " กำลังอัปโหลดไปยัง Drive...";
-      const res = await fetch(API_URL, { method: "POST", body: params.toString(), headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+      statusEl.innerText = "⏳ กำลังอัปโหลดไปยัง Drive...";
+      const res = await fetch(API_URL, {
+        method: "POST",
+        body: params.toString(),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
+      });
       const result = await res.json();
       if (result.status === "success") {
-        statusEl.innerText = "✅ บันทึกสำเร็จ"; statusEl.classList.add('text-emerald-400');
+        statusEl.innerText = "✅ บันทึกสำเร็จ (" + currentMimeType + ")";
+        statusEl.classList.add('text-emerald-400');
         alert("อัปโหลดเรียบร้อยครับ!");
-      } else { throw new Error(result.message); }
+      } else {
+        throw new Error(result.message);
+      }
     } catch (e) {
-      console.error(e); statusEl.innerText = "❌ อัปโหลดไม่สำเร็จ"; alert("เกิดข้อผิดพลาด: " + e.message);
+      console.error(e);
+      statusEl.innerText = "❌ อัปโหลดไม่สำเร็จ";
+      alert("เกิดข้อผิดพลาดในการส่งข้อมูล: " + e.message);
     } finally {
       uploadOverlay.style.display = 'none';
-      startBtn.disabled = false; startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      startBtn.disabled = false;
+      startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
     }
   };
 }
